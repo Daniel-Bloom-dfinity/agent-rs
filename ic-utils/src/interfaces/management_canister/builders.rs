@@ -43,6 +43,7 @@ pub struct CanisterSettings {
 #[derive(Debug)]
 pub struct CreateCanisterBuilder<'agent, 'canister: 'agent> {
     canister: &'canister Canister<'agent>,
+    effective_canister_id: Principal,
     controllers: Option<Result<Vec<Principal>, AgentError>>,
     compute_allocation: Option<Result<ComputeAllocation, AgentError>>,
     memory_allocation: Option<Result<MemoryAllocation, AgentError>>,
@@ -56,6 +57,7 @@ impl<'agent, 'canister: 'agent> CreateCanisterBuilder<'agent, 'canister> {
     pub fn builder(canister: &'canister Canister<'agent>) -> Self {
         Self {
             canister,
+            effective_canister_id: canister.canister_id,
             controllers: None,
             compute_allocation: None,
             memory_allocation: None,
@@ -193,6 +195,12 @@ impl<'agent, 'canister: 'agent> CreateCanisterBuilder<'agent, 'canister> {
         self.with_optional_freezing_threshold(Some(freezing_threshold))
     }
 
+    /// Sets the [effective canister ID](https://smartcontracts.org/docs/interface-spec/index.html#http-effective-canister-id) of the destination.
+    pub fn with_effective_canister_id(mut self, canister_id: Principal) -> Self {
+        self.effective_canister_id = canister_id;
+        self
+    }
+
     /// Create an [AsyncCall] implementation that, when called, will create a
     /// canister.
     pub fn build(self) -> Result<impl 'agent + AsyncCall<(Principal,)>, AgentError> {
@@ -252,6 +260,7 @@ impl<'agent, 'canister: 'agent> CreateCanisterBuilder<'agent, 'canister> {
         };
 
         Ok(async_builder
+            .with_effective_canister_id(self.effective_canister_id)
             .build()
             .map(|result: (Out,)| (result.0.canister_id,)))
     }
