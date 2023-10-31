@@ -23,13 +23,15 @@ use crate::{
 /// A [`Transport`] using [`reqwest`] to make HTTP calls to the Internet Computer.
 #[derive(Debug)]
 pub struct ReqwestTransport {
-    url: Url,
+    route: Box<dyn RouteProvider>,
     client: Client,
     max_response_body_size: Option<usize>,
 }
 
 #[doc(hidden)]
-pub use ReqwestTransport as ReqwestHttpReplicaV2Transport; // deprecate after 0.24
+pub use ReqwestTransport as ReqwestHttpReplicaV2Transport;
+
+use super::route_provider::RouteProvider; // deprecate after 0.24
 
 impl ReqwestTransport {
     /// Creates a replica transport from a HTTP URL.
@@ -52,23 +54,17 @@ impl ReqwestTransport {
 
     /// Creates a replica transport from a HTTP URL and a [`reqwest::Client`].
     pub fn create_with_client<U: Into<String>>(url: U, client: Client) -> Result<Self, AgentError> {
-        let url = url.into();
+        Self::create_with_client_route(todo!(), client)
+    }
+
+    pub fn create_with_client_route(route: Box<dyn RouteProvider>, client: Client) -> Result<Self, AgentError> {
         Ok(Self {
-            url: Url::parse(&url)
-                .and_then(|mut url| {
-                    // rewrite *.ic0.app to ic0.app
-                    if let Some(domain) = url.domain() {
-                        if domain.ends_with(IC0_SUB_DOMAIN) {
-                            url.set_host(Some(IC0_DOMAIN))?;
-                        }
-                    }
-                    url.join("api/v2/")
-                })
-                .map_err(|_| AgentError::InvalidReplicaUrl(url.clone()))?,
+            route,
             client,
             max_response_body_size: None,
         })
     }
+
 
     /// Sets a max response body size limit
     pub fn with_max_response_body_size(self, max_response_body_size: usize) -> Self {
@@ -127,7 +123,7 @@ impl ReqwestTransport {
         endpoint: &str,
         body: Option<Vec<u8>>,
     ) -> Result<Vec<u8>, AgentError> {
-        let url = self.url.join(endpoint)?;
+        let url = self.route.route().join(endpoint)?;
         let mut http_request = Request::new(method, url);
         http_request
             .headers_mut()
