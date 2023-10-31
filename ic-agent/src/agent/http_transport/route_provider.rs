@@ -32,6 +32,7 @@ impl RouteProvider for RoundRobinRouteProvider {
 
 impl RoundRobinRouteProvider {
     pub fn new<T: AsRef<str>>(routes: Vec<T>) -> Self {
+        /* TODO: filter the IC0_SUB_DOMAIN stuff */
         let routes = routes
             .iter()
             .map(|r| Url::from_str(r.as_ref()).expect("invalid url"))
